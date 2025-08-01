@@ -1,6 +1,6 @@
-import re
+import re, os
 from textnode import TextType, TextNode, BlockType
-from htmlnode import LeafNode
+from htmlnode import LeafNode, ParentNode
 
 def text_node_to_html_node(text_node):
     if text_node.text_type == TextType.TEXT:
@@ -148,27 +148,102 @@ def markdown_to_blocks(markdown):
     blocks = [block.strip() for block in raw_blocks if block.strip()]
     return blocks
 
-def block_to_block_type(block):
-    lines = block.splitlines()
+def block_to_block_type(block: str) -> BlockType:
+    lines = block.split("\n")
 
-    if lines[0].strip().startswith("```") and lines[-1].strip().endswith("```"):
+    if block.startswith("```") and block.endswith("```"):
         return BlockType.CODE
-
     if re.match(r"^#{1,6} ", lines[0]):
         return BlockType.HEADING
-
-    if all(line.strip().startswith(">") for line in lines):
+    if all(line.startswith(">") for line in lines):
         return BlockType.QUOTE
-
-    if all(line.strip().startswith("- ") for line in lines):
+    if all(line.startswith("- ") for line in lines):
         return BlockType.UNORDERED_LIST
-
-    ordered = True
+    ordered_match = True
     for i, line in enumerate(lines):
-        if not re.match(rf"^{i+1}\. ", line.strip()):
-            ordered = False
+        expected_prefix = f"{i+1}. "
+        if not line.startswith(expected_prefix):
+            ordered_match = False
             break
-    if ordered:
+    if ordered_match:
         return BlockType.ORDERED_LIST
-
     return BlockType.PARAGRAPH
+
+
+def text_to_children(text):
+    return [text_node_to_html_node(node) for node in text_to_textnodes(text)]
+
+def block_to_html_node(block):
+    block_type = block_to_block_type(block)
+
+    if block_type == BlockType.PARAGRAPH:
+        normalized_text = " ".join(block.splitlines()).strip()
+        children = text_to_children(normalized_text)
+        return ParentNode("p", children)
+    
+    elif block_type == BlockType.HEADING:
+        heading_level = len(re.match(r"^(#+)", block).group(1))
+        text = block[heading_level+1:].strip()
+        children = text_to_children(text)
+        return ParentNode(f"h{heading_level}", children)
+
+    elif block_type == BlockType.CODE:
+        inner = block.strip()[3:-3].lstrip("\n")
+        text_node = TextNode(inner, TextType.TEXT)
+        html_node = text_node_to_html_node(text_node)
+        return ParentNode("pre", [ParentNode("code", [html_node])])
+
+    elif block_type == BlockType.QUOTE:
+        lines = [line[1:].strip() for line in block.split("\n")]
+        inner_text = " ".join(lines)
+        children = text_to_children(inner_text)
+        return ParentNode("blockquote", children)
+
+    elif block_type == BlockType.UNORDERED_LIST:
+        items = block.split("\n")
+        li_nodes = [ParentNode("li", text_to_children(item[2:].strip())) for item in items]
+        return ParentNode("ul", li_nodes)
+
+    elif block_type == BlockType.ORDERED_LIST:
+        items = block.split("\n")
+        li_nodes = []
+        for item in items:
+            dot_index = item.find(". ")
+            if dot_index != -1:
+                text = item[dot_index+2:].strip()
+                li_nodes.append(ParentNode("li", text_to_children(text)))
+        return ParentNode("ol", li_nodes)
+
+    else:
+        raise ValueError(f"Unsupported block type: {block_type}")
+
+def markdown_to_html_node(markdown):
+    blocks = markdown_to_blocks(markdown)
+    block_nodes = [block_to_html_node(block) for block in blocks]
+    return ParentNode("div", block_nodes)
+
+def extract_title(markdown: str) -> str:
+    for line in markdown.splitlines():
+        if line.startswith("# "):
+            return line[2:].strip()
+    raise Exception("No H1 header found in markdown.")
+
+def generate_page(from_path, template_path, dest_path):
+    print(f"Generating page from {from_path} to {dest_path} using {template_path}")
+
+    with open(from_path, "r", encoding="utf-8") as f:
+        markdown_content = f.read()
+
+    with open(template_path, "r", encoding="utf-8") as f:
+        template_content = f.read()
+
+    html_node = markdown_to_html_node(markdown_content)
+    html = html_node.to_html()
+
+    title = extract_title(markdown_content)
+    full_html = template_content.replace("{{ Title }}", title).replace("{{ Content }}", html)
+
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+    with open(dest_path, "w", encoding="utf-8") as f:
+        f.write(full_html)

@@ -2,7 +2,17 @@ import unittest
 
 from textnode import TextNode, TextType, BlockType
 from htmlnode import HTMLNode, LeafNode, ParentNode
-from functions import split_nodes_delimiter, extract_markdown_images, extract_markdown_links, split_nodes_image, split_nodes_link, markdown_to_blocks, block_to_block_type
+from functions import (
+    split_nodes_delimiter, 
+    extract_markdown_images, 
+    extract_markdown_links, 
+    split_nodes_image, 
+    split_nodes_link, 
+    markdown_to_blocks, 
+    block_to_block_type, 
+    markdown_to_html_node, 
+    extract_title
+    )
 
 class TestHTMLNode(unittest.TestCase):
     def test_props_to_html_multiple_attributes(self): 
@@ -467,6 +477,127 @@ class TestBlockToBlockType(unittest.TestCase):
         multiline_para = "Line one of paragraph\nLine two of paragraph"
         self.assertEqual(block_to_block_type(multiline_para), BlockType.PARAGRAPH)
 
+class TestMarkdownToHTML(unittest.TestCase):
+    def test_paragraphs(self):
+        md = """
+This is **bolded** paragraph
+text in a p
+tag here
+
+This is another paragraph with _italic_ text and `code` here
+
+"""
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><p>This is <b>bolded</b> paragraph text in a p tag here</p><p>This is another paragraph with <i>italic</i> text and <code>code</code> here</p></div>",
+            )
+
+    def test_codeblock(self):
+        md = """
+```
+This is text that _should_ remain
+the **same** even with inline stuff
+```
+"""
+
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><pre><code>This is text that _should_ remain\nthe **same** even with inline stuff\n</code></pre></div>",
+            )
+    
+    def test_heading(self):
+        md = """
+# Heading One
+
+## Heading Two with _italic_ and **bold**
+"""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><h1>Heading One</h1><h2>Heading Two with <i>italic</i> and <b>bold</b></h2></div>",
+            )
+
+    def test_unordered_list(self):
+        md = """
+- Item one with `code`
+- Item **two**
+- _Item three_
+"""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><ul><li>Item one with <code>code</code></li><li>Item <b>two</b></li><li><i>Item three</i></li></ul></div>",
+            )
+
+    def test_ordered_list(self):
+        md = """
+1. First item
+2. Second item with _italic_
+3. Third **bold** item
+"""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><ol><li>First item</li><li>Second item with <i>italic</i></li><li>Third <b>bold</b> item</li></ol></div>",
+            )
+
+    def test_blockquote(self):
+        md = """
+> This is a quote with **bold** and _italic_
+"""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><blockquote>This is a quote with <b>bold</b> and <i>italic</i></blockquote></div>",
+            )
+
+    def test_multiple_blocks(self):
+        md = """
+# Title
+
+This is a paragraph with `inline code`.
+
+- List item one
+- List item two
+
+> A final quote
+"""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(
+            html,
+            "<div><h1>Title</h1><p>This is a paragraph with <code>inline code</code>.</p><ul><li>List item one</li><li>List item two</li></ul><blockquote>A final quote</blockquote></div>",
+            )
+
+    def test_empty_markdown(self):
+        md = ""
+        node = markdown_to_html_node(md)
+        html = node.to_html()
+        self.assertEqual(html, "<div></div>")
+
+class TestExtractTitle(unittest.TestCase):
+    def test_single_h1(self):
+        self.assertEqual(extract_title("# Hello World"), "Hello World")
+
+    def test_h1_with_whitespace(self):
+        self.assertEqual(extract_title("   #   My Title   "), "My Title")
+
+    def test_h1_in_middle(self):
+        md = "This is a doc\n## Subheader\n# Main Title\nSome more text"
+        self.assertEqual(extract_title(md), "Main Title")
+
+    def test_no_h1_raises(self):
+        with self.assertRaises(Exception):
+            extract_title("## Subheader\n### Subsubheader")
 if __name__ == "__main__":
     unittest.main()
 
