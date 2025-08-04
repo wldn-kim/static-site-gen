@@ -247,3 +247,20 @@ def generate_page(from_path, template_path, dest_path):
 
     with open(dest_path, "w", encoding="utf-8") as f:
         f.write(full_html)
+
+def generate_pages_recursive(dir_path_content: str, template_path: str, dest_dir_path: str):
+    for root, _, files in os.walk(dir_path_content):
+        for file in files:
+            if file.endswith(".md"):
+                content_md_path = os.path.join(root, file)
+
+                relative_path = os.path.relpath(content_md_path, dir_path_content)
+
+                relative_html_path = os.path.splitext(relative_path)[0] + ".html"
+                output_html_path = os.path.join(dest_dir_path, relative_html_path)
+
+                output_dir = os.path.dirname(output_html_path)
+                os.makedirs(output_dir, exist_ok=True)
+
+                print(f"Generating page: {content_md_path} -> {output_html_path}")
+                generate_page(content_md_path, template_path, output_html_path)
