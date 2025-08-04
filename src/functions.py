@@ -1,4 +1,4 @@
-import re, os
+import re
 from textnode import TextType, TextNode, BlockType
 from htmlnode import LeafNode, ParentNode
 
@@ -169,7 +169,6 @@ def block_to_block_type(block: str) -> BlockType:
         return BlockType.ORDERED_LIST
     return BlockType.PARAGRAPH
 
-
 def text_to_children(text):
     return [text_node_to_html_node(node) for node in text_to_textnodes(text)]
 
@@ -228,39 +227,3 @@ def extract_title(markdown: str) -> str:
             return line[2:].strip()
     raise Exception("No H1 header found in markdown.")
 
-def generate_page(from_path, template_path, dest_path):
-    print(f"Generating page from {from_path} to {dest_path} using {template_path}")
-
-    with open(from_path, "r", encoding="utf-8") as f:
-        markdown_content = f.read()
-
-    with open(template_path, "r", encoding="utf-8") as f:
-        template_content = f.read()
-
-    html_node = markdown_to_html_node(markdown_content)
-    html = html_node.to_html()
-
-    title = extract_title(markdown_content)
-    full_html = template_content.replace("{{ Title }}", title).replace("{{ Content }}", html)
-
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-
-    with open(dest_path, "w", encoding="utf-8") as f:
-        f.write(full_html)
-
-def generate_pages_recursive(dir_path_content: str, template_path: str, dest_dir_path: str):
-    for root, _, files in os.walk(dir_path_content):
-        for file in files:
-            if file.endswith(".md"):
-                content_md_path = os.path.join(root, file)
-
-                relative_path = os.path.relpath(content_md_path, dir_path_content)
-
-                relative_html_path = os.path.splitext(relative_path)[0] + ".html"
-                output_html_path = os.path.join(dest_dir_path, relative_html_path)
-
-                output_dir = os.path.dirname(output_html_path)
-                os.makedirs(output_dir, exist_ok=True)
-
-                print(f"Generating page: {content_md_path} -> {output_html_path}")
-                generate_page(content_md_path, template_path, output_html_path)

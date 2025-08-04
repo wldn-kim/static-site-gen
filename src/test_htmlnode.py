@@ -598,6 +598,7 @@ class TestExtractTitle(unittest.TestCase):
     def test_no_h1_raises(self):
         with self.assertRaises(Exception):
             extract_title("## Subheader\n### Subsubheader")
+            
 if __name__ == "__main__":
     unittest.main()
 
